@@ -252,7 +252,6 @@ configure_build() {
         --with-boot-jdk="$BOOTSTRAP_JDK_PATH" \
         --with-native-debug-symbols=none \
         --with-debug-level=release \
-        --with-toolchain-type=clang \
         --disable-warnings-as-errors \
         --with-extra-ldflags="-static" \
         --with-extra-cflags="-static" \
