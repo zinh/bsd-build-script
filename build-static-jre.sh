@@ -120,13 +120,17 @@ install_dependencies() {
     # Fix package repository configuration
     fix_pkg_repos
     
-    pkg update -f
+    log "Updating package database with timeout..."
+    timeout 300 pkg update -f || {
+        warn "Package update timed out or failed, continuing anyway..."
+    }
     
     # Determine bootstrap JDK based on target version
     determine_bootstrap_jdk
     
-    # Essential build tools
-    pkg install -y \
+    log "Installing essential build tools..."
+    # Install packages with timeout and better error handling
+    timeout 600 pkg install -y \
         ${BOOTSTRAP_JDK_PKG} \
         gmake \
         autoconf \
@@ -138,10 +142,13 @@ install_dependencies() {
         unzip \
         git \
         curl \
-        wget
+        wget || {
+        error "Failed to install essential build tools"
+    }
     
-    # Additional libraries that might be needed
-    pkg install -y \
+    log "Installing additional libraries (optional)..."
+    # Additional libraries that might be needed (with timeout and non-fatal errors)
+    timeout 300 pkg install -y \
         freetype2 \
         fontconfig \
         libX11 \
@@ -151,7 +158,9 @@ install_dependencies() {
         libXrandr \
         libXtst \
         alsa-lib \
-        cups || true  # Don't fail if some packages aren't available
+        cups || {
+        warn "Some additional libraries failed to install, continuing anyway..."
+    }
     
     # Verify essential commands are available
     verify_essential_tools
