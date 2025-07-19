@@ -258,7 +258,7 @@ configure_build() {
         --with-extra-cflags="-static" \
         --with-extra-cxxflags="-static" \
         --prefix="$INSTALL_PREFIX" \
-        --with-version-string="${OPENJDK_VERSION}.0.0+freebsd-static" \
+        --with-version-string="${OPENJDK_VERSION}.0.0-freebsd-static" \
         --with-vendor-name="FreeBSD-Static-Build" \
         --with-vendor-url="https://github.com/your-repo" \
         --with-vendor-bug-url="https://github.com/your-repo/issues"
