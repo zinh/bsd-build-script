@@ -5,7 +5,7 @@ freebsd_jre_build_task:
   
   # Use FreeBSD 14.0 (adjust version as needed)
   freebsd_instance:
-    image_family: freebsd-13-4
+    image_family: freebsd-13-0
     cpu: 8  # Use more CPUs for faster build
     memory: 16G  # OpenJDK build needs significant memory
   
