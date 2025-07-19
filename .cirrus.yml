@@ -3,9 +3,9 @@
 freebsd_jre_build_task:
   name: "Build Static JRE on FreeBSD"
   
-  # Use FreeBSD 14.0 (adjust version as needed)
+  # Use FreeBSD 13.4 as specified
   freebsd_instance:
-    image_family: freebsd-13-0
+    image_family: freebsd-13-4
     cpu: 8  # Use more CPUs for faster build
     memory: 16G  # OpenJDK build needs significant memory
   
@@ -16,6 +16,7 @@ freebsd_jre_build_task:
   environment:
     OPENJDK_VERSION: "13"  # Change to desired version (8, 11, 17, 21)
     CIRRUS_SHELL: /bin/sh
+    ASSUME_ALWAYS_YES: yes  # Auto-answer yes to pkg prompts
   
   # Cache dependencies to speed up subsequent builds
   pkg_cache:
@@ -24,6 +25,10 @@ freebsd_jre_build_task:
   
   # Install script
   install_script: |
+    # Fix package repository first
+    chmod +x pkg-fix.sh
+    ./pkg-fix.sh
+    
     # Make build script executable
     chmod +x build-static-jre.sh
     
@@ -66,50 +71,50 @@ freebsd_jre_build_task:
       path: "/tmp/openjdk-build/**/*.log"
 
 # Optional: Matrix build for multiple versions
-# matrix_build_task:
-#   name: "Build JRE Matrix"
-#   
-#   freebsd_instance:
-#     image_family: freebsd-14-0
-#     cpu: 6
-#     memory: 12G
-#   
-#   timeout_in: 150m
-#   
-#   environment:
-#     matrix:
-#       - OPENJDK_VERSION: "11"
-#       - OPENJDK_VERSION: "17"
-#       - OPENJDK_VERSION: "21"
-#   
-#   # Only run matrix build on tags or main branch
-#   only_if: $CIRRUS_TAG != '' || $CIRRUS_BRANCH == 'main'
-#   
-#   build_script: |
-#     chmod +x build-static-jre.sh
-#     ./build-static-jre.sh
-#   
-#   verify_script: |
-#     tar -tf openjdk-${OPENJDK_VERSION}-jre-freebsd-$(uname -m)-static.tar.gz | head -20
-#     
-#   artifacts:
-#     path: "*.tar.gz"
-# 
-# # Optional: Docker build task (if you want to also build Linux version for comparison)
-# linux_comparison_task:
-#   name: "Linux JRE Build (Comparison)"
-#   
-#   container:
-#     image: ubuntu:22.04
-#     cpu: 4
-#     memory: 8G
-#   
-#   depends_on: freebsd_jre_build
-#   
-#   install_script: |
-#     apt-get update
-#     apt-get install -y openjdk-17-jdk build-essential
-#   
-#   build_script: |
-#     echo "This would build Linux version for comparison"
-#     java -version
+matrix_build_task:
+  name: "Build JRE Matrix"
+  
+  freebsd_instance:
+    image_family: freebsd-13-4
+    cpu: 6
+    memory: 12G
+  
+  timeout_in: 150m
+  
+  environment:
+    matrix:
+      - OPENJDK_VERSION: "11"
+      - OPENJDK_VERSION: "17"
+      - OPENJDK_VERSION: "21"
+  
+  # Only run matrix build on tags or main branch
+  only_if: $CIRRUS_TAG != '' || $CIRRUS_BRANCH == 'main'
+  
+  build_script: |
+    chmod +x build-static-jre.sh
+    ./build-static-jre.sh
+  
+  verify_script: |
+    tar -tf openjdk-${OPENJDK_VERSION}-jre-freebsd-$(uname -m)-static.tar.gz | head -20
+    
+  artifacts:
+    path: "*.tar.gz"
+
+# Optional: Docker build task (if you want to also build Linux version for comparison)
+linux_comparison_task:
+  name: "Linux JRE Build (Comparison)"
+  
+  container:
+    image: ubuntu:22.04
+    cpu: 4
+    memory: 8G
+  
+  depends_on: freebsd_jre_build
+  
+  install_script: |
+    apt-get update
+    apt-get install -y openjdk-17-jdk build-essential
+  
+  build_script: |
+    echo "This would build Linux version for comparison"
+    java -version
