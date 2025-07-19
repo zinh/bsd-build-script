@@ -5,7 +5,7 @@ set -e
 # This script builds a statically linked OpenJDK JRE on FreeBSD
 
 # Configuration
-OPENJDK_VERSION="13"
+OPENJDK_VERSION="17"
 BUILD_DIR="/tmp/openjdk-build"
 INSTALL_PREFIX="/usr/local"
 OUTPUT_DIR="$PWD/jre-static"
