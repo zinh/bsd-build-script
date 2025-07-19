@@ -29,6 +29,83 @@ error() {
     exit 1
 }
 
+# Determine bootstrap JDK package
+determine_bootstrap_jdk() {
+    log "Determining bootstrap JDK for OpenJDK ${OPENJDK_VERSION}..."
+    
+    case "$OPENJDK_VERSION" in
+        "8")
+            # JDK 8 can bootstrap with JDK 7 or 8, but we'll use a later version
+            BOOTSTRAP_JDK_PKG="openjdk11"
+            BOOTSTRAP_JDK_PATH="/usr/local/openjdk11"
+            ;;
+        "11")
+            # JDK 11 can bootstrap with JDK 10 or later
+            BOOTSTRAP_JDK_PKG="openjdk17"
+            BOOTSTRAP_JDK_PATH="/usr/local/openjdk17"
+            ;;
+        "17")
+            # JDK 17 can bootstrap with JDK 16 or later
+            # We can use the same version or a later one
+            BOOTSTRAP_JDK_PKG="openjdk17"
+            BOOTSTRAP_JDK_PATH="/usr/local/openjdk17"
+            ;;
+        "21")
+            # JDK 21 can bootstrap with JDK 20 or later
+            BOOTSTRAP_JDK_PKG="openjdk21"
+            BOOTSTRAP_JDK_PATH="/usr/local/openjdk21"
+            ;;
+        *)
+            warn "Unknown OpenJDK version $OPENJDK_VERSION, defaulting to OpenJDK 17 as bootstrap"
+            BOOTSTRAP_JDK_PKG="openjdk17"
+            BOOTSTRAP_JDK_PATH="/usr/local/openjdk17"
+            ;;
+    esac
+    
+    log "Using bootstrap JDK: $BOOTSTRAP_JDK_PKG at $BOOTSTRAP_JDK_PATH"
+}
+
+# Fix package repository configuration
+fix_pkg_repos() {
+    log "Fixing package repository configuration..."
+    
+    # Get actual FreeBSD version
+    FREEBSD_VERSION=$(freebsd-version | cut -d'-' -f1)
+    FREEBSD_MAJOR=$(echo $FREEBSD_VERSION | cut -d'.' -f1)
+    
+    log "Detected FreeBSD version: $FREEBSD_VERSION (Major: $FREEBSD_MAJOR)"
+    
+    # Backup original config
+    cp /etc/pkg/FreeBSD.conf /etc/pkg/FreeBSD.conf.backup 2>/dev/null || true
+    
+    # Create correct repository configuration
+    cat > /etc/pkg/FreeBSD.conf << EOF
+FreeBSD: {
+    url: "pkg+http://pkg.FreeBSD.org/\${ABI}/quarterly",
+    mirror_type: "srv",
+    signature_type: "fingerprints",
+    fingerprints: "/usr/share/keys/pkg",
+    enabled: yes
+}
+EOF
+    
+    # Alternative: Use latest packages instead of quarterly
+    # cat > /etc/pkg/FreeBSD.conf << EOF
+# FreeBSD: {
+#     url: "pkg+http://pkg.FreeBSD.org/\${ABI}/latest",
+#     mirror_type: "srv",
+#     signature_type: "fingerprints",
+#     fingerprints: "/usr/share/keys/pkg",
+#     enabled: yes
+# }
+# EOF
+    
+    # Force update package database
+    pkg update -f
+    
+    log "Package repository configuration fixed"
+}
+
 # Check if running as root for package installation
 check_root() {
     if [ "$(id -u)" != "0" ]; then
@@ -40,11 +117,17 @@ check_root() {
 install_dependencies() {
     log "Installing build dependencies..."
     
+    # Fix package repository configuration
+    fix_pkg_repos
+    
     pkg update -f
+    
+    # Determine bootstrap JDK based on target version
+    determine_bootstrap_jdk
     
     # Essential build tools
     pkg install -y \
-        openjdk${OPENJDK_VERSION} \
+        ${BOOTSTRAP_JDK_PKG} \
         gmake \
         autoconf \
         automake \
@@ -53,7 +136,6 @@ install_dependencies() {
         bash \
         zip \
         unzip \
-        which \
         git \
         curl \
         wget
@@ -69,9 +151,31 @@ install_dependencies() {
         libXrandr \
         libXtst \
         alsa-lib \
-        cups
+        cups || true  # Don't fail if some packages aren't available
+    
+    # Verify essential commands are available
+    verify_essential_tools
     
     log "Dependencies installed successfully"
+}
+
+# Verify essential tools are available
+verify_essential_tools() {
+    log "Verifying essential tools..."
+    
+    # Check for commands that should be in base system
+    for cmd in which make; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            warn "$cmd not found in base system"
+        else
+            log "✓ $cmd available"
+        fi
+    done
+    
+    # Check for gmake specifically
+    if ! command -v gmake >/dev/null 2>&1; then
+        error "gmake not installed - this is required for OpenJDK build"
+    fi
 }
 
 # Download OpenJDK source
@@ -81,18 +185,50 @@ download_source() {
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
     
-    # Download from official OpenJDK repository
-    if [ ! -d "jdk${OPENJDK_VERSION}u" ]; then
-        git clone --depth 1 https://github.com/openjdk/jdk${OPENJDK_VERSION}u.git
-    fi
+    # Download OpenJDK 17 source
+    case "$OPENJDK_VERSION" in
+        "17")
+            if [ ! -d "jdk17u" ]; then
+                log "Downloading OpenJDK 17 LTS source..."
+                git clone --depth 1 https://github.com/openjdk/jdk17u.git
+            fi
+            SOURCE_DIR="jdk17u"
+            ;;
+        "8")
+            if [ ! -d "jdk8u" ]; then
+                git clone --depth 1 https://github.com/openjdk/jdk8u.git
+            fi
+            SOURCE_DIR="jdk8u"
+            ;;
+        "11")
+            if [ ! -d "jdk11u" ]; then
+                git clone --depth 1 https://github.com/openjdk/jdk11u.git
+            fi
+            SOURCE_DIR="jdk11u"
+            ;;
+        "21")
+            if [ ! -d "jdk21u" ]; then
+                git clone --depth 1 https://github.com/openjdk/jdk21u.git
+            fi
+            SOURCE_DIR="jdk21u"
+            ;;
+        *)
+            error "Unsupported OpenJDK version: $OPENJDK_VERSION"
+            ;;
+    esac
     
-    cd "jdk${OPENJDK_VERSION}u"
-    log "Source downloaded successfully"
+    cd "$SOURCE_DIR"
+    log "Source downloaded successfully to $PWD"
 }
 
 # Configure build for static linking
 configure_build() {
     log "Configuring OpenJDK build..."
+    
+    # Verify bootstrap JDK exists
+    if [ ! -d "$BOOTSTRAP_JDK_PATH" ]; then
+        error "Bootstrap JDK not found at $BOOTSTRAP_JDK_PATH"
+    fi
     
     # Set environment variables for static linking
     export CC=clang
@@ -102,9 +238,9 @@ configure_build() {
     export CXXFLAGS="-static -I/usr/local/include"
     export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
     
-    # Configure with static linking options
+    # Configure OpenJDK 17 build with static linking options
     bash configure \
-        --with-boot-jdk="/usr/local/openjdk${OPENJDK_VERSION}" \
+        --with-boot-jdk="$BOOTSTRAP_JDK_PATH" \
         --with-native-debug-symbols=none \
         --with-debug-level=release \
         --enable-static-build \
@@ -113,8 +249,8 @@ configure_build() {
         --with-extra-cflags="-static" \
         --with-extra-cxxflags="-static" \
         --prefix="$INSTALL_PREFIX" \
-        --with-version-string="${OPENJDK_VERSION}.0.0+custom" \
-        --with-vendor-name="FreeBSD-Static" \
+        --with-version-string="${OPENJDK_VERSION}.0.0+freebsd-static" \
+        --with-vendor-name="FreeBSD-Static-Build" \
         --with-vendor-url="https://github.com/your-repo" \
         --with-vendor-bug-url="https://github.com/your-repo/issues"
     

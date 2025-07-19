@@ -88,6 +88,12 @@ test_pkg() {
         pkg update -f
         return 1
     fi
+    
+    # Verify common commands are available
+    echo "Checking for required commands:"
+    command -v which >/dev/null 2>&1 && echo "✓ which command available" || echo "✗ which command missing"
+    command -v gmake >/dev/null 2>&1 && echo "✓ gmake available" || echo "✗ gmake missing (will be installed)"
+    command -v git >/dev/null 2>&1 && echo "✓ git available" || echo "✗ git missing (will be installed)"
 }
 
 # Show repository status
