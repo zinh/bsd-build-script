@@ -143,8 +143,8 @@ install_dependencies() {
         git \
         curl \
         wget \
-        llvm-base \
-        base-compiler-dev || {
+#        llvm-base \
+#        base-compiler-dev || {
         error "Failed to install essential build tools"
     }
     
@@ -242,8 +242,8 @@ configure_build() {
     fi
     
     # Set environment variables for static linking
-    export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
-    export PATH="/usr/bin:/usr/local/bin:$PATH"
+    # export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
+    # export PATH="/usr/bin:/usr/local/bin:$PATH"
     
     # Configure OpenJDK 17 build - let it auto-detect toolchain without forcing type
     bash configure \
@@ -255,10 +255,6 @@ configure_build() {
         --with-extra-cflags="-static -I/usr/local/include" \
         --with-extra-cxxflags="-static -I/usr/local/include" \
         --prefix="$INSTALL_PREFIX" \
-        --with-version-string="${OPENJDK_VERSION}.0.0-freebsd-static" \
-        --with-vendor-name="FreeBSD-Static-Build" \
-        --with-vendor-url="https://github.com/your-repo" \
-        --with-vendor-bug-url="https://github.com/your-repo/issues"
     
     log "Build configured successfully"
 }
