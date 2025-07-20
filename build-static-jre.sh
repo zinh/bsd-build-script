@@ -141,8 +141,7 @@ install_dependencies() {
         zip \
         unzip \
         git \
-        curl \
-        wget || {
+        curl || {
         error "Failed to install essential build tools"
     }
     
@@ -240,28 +239,19 @@ configure_build() {
     fi
     
     # Set environment variables for static linking
-    export CC=clang
-    export CXX=clang++
-    export LDFLAGS="-static -L/usr/local/lib"
-    export CFLAGS="-static -I/usr/local/include"
-    export CXXFLAGS="-static -I/usr/local/include"
-    export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
+    # export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
+    # export PATH="/usr/bin:/usr/local/bin:$PATH"
     
-    # Configure OpenJDK 17 build with static linking options
+    # Configure OpenJDK 17 build - let it auto-detect toolchain without forcing type
     bash configure \
         --with-boot-jdk="$BOOTSTRAP_JDK_PATH" \
         --with-native-debug-symbols=none \
         --with-debug-level=release \
-        --with-toolchain-type=clang \
         --disable-warnings-as-errors \
-        --with-extra-ldflags="-static" \
-        --with-extra-cflags="-static" \
-        --with-extra-cxxflags="-static" \
+        --with-extra-ldflags="-static -L/usr/local/lib" \
+        --with-extra-cflags="-static -I/usr/local/include" \
+        --with-extra-cxxflags="-static -I/usr/local/include" \
         --prefix="$INSTALL_PREFIX" \
-        --with-version-string="${OPENJDK_VERSION}.0.0-freebsd-static" \
-        --with-vendor-name="FreeBSD-Static-Build" \
-        --with-vendor-url="https://github.com/your-repo" \
-        --with-vendor-bug-url="https://github.com/your-repo/issues"
     
     log "Build configured successfully"
 }
