@@ -142,9 +142,9 @@ install_dependencies() {
         unzip \
         git \
         curl \
-        wget \
 #        llvm-base \
 #        base-compiler-dev || {
+        wget || {
         error "Failed to install essential build tools"
     }
     
