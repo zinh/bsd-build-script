@@ -142,7 +142,9 @@ install_dependencies() {
         unzip \
         git \
         curl \
-        wget || {
+        wget \
+        llvm \
+        clang || {
         error "Failed to install essential build tools"
     }
     
